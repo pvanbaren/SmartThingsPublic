@@ -37,7 +37,7 @@ preferences
 	}
 	section("unless there is movement...")
 	{
-		input "themotion", "capability.motionSensor", title: "Where?", multiple: true
+		input "themotion", "capability.motionSensor", title: "Where? (optional)", multiple: true, required: false
 	}
 }
 
@@ -80,34 +80,44 @@ def motionStoppedHandler(evt)
 
 def checkMotion()
 {
-	def motionState = themotion.currentState("motion")
+	if (themotion)
+    {
+        def motionState = themotion.currentState("motion").value
 
-	// Check if any motion sensor is active
-	if (motionState.contains("active"))
-	{
-		// Motion active; just log it and do nothing
-		log.debug "Motion is active yet, resetting the timer"
-		resetTimeout()
-	}
-	else
-	{
-		// Get the time elapsed between now and when the motion reported inactive
-		// The elapsed time is in milliseconds, but comparisons are in seconds
-		def elapsed = (now() - state.lastMotion) / 1000
+		log.debug "motionState is $motionState"
 
-		def threshold = 60 * thetime
+        // Check if any motion sensor is active
+        if (motionState.contains("active"))
+        {
+            // Motion active; just log it and do nothing
+            log.debug "Motion is active yet, resetting the timer"
+            resetTimeout()
+        }
+        else
+        {
+            // Get the time elapsed between now and when the motion reported inactive
+            // The elapsed time is in milliseconds, but comparisons are in seconds
+            def elapsed = (now() - state.lastMotion) / 1000
 
-		if (elapsed >= (threshold - 1))
-		{
-			log.debug "Motion inactive for $elapsed sec: turning switch off"
-			theswitch.off()
-		}
-		else
-		{
-			log.debug "Motion inactive for $elapsed sec"
-			scheduleCheckMotion(threshold - elapsed)
-		}
-	}
+            def threshold = 60 * thetime
+
+            if (elapsed >= (threshold - 1))
+            {
+                log.debug "Motion inactive for $elapsed sec: turning switch off"
+                theswitch.off()
+            }
+            else
+            {
+                log.debug "Motion inactive for $elapsed sec"
+                scheduleCheckMotion(threshold - elapsed)
+            }
+        }
+    }
+    else
+    {
+    	log.debug "No motion configured, turning switch off"
+    	theswitch.off()
+    }
 }
 
 private resetTimeout()
@@ -119,7 +129,11 @@ private resetTimeout()
 private scheduleCheckMotion(def inSeconds)
 {
 	// Try to turn off the lights after the timeout
-	// but no sooner than 30 seconds from now
-	def nextCheck = Math.max(30, inSeconds)
+	// but no sooner than 20 seconds from now
+	def nextCheck = inSeconds;
+    if (nextCheck < 20)
+    {
+    	nextCheck = 20
+    }
 	runIn(nextCheck, checkMotion)
 }
